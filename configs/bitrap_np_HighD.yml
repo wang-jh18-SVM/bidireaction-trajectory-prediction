@@ -3,7 +3,7 @@ CKPT_DIR: "checkpoints/PIE_checkpoints/goal_cvae_checkpoints/"
 OUT_DIR: "outputs/PIE_outputs/goal_cvae_outputs"
 DEVICE: "cuda"
 METHOD: "BiTraPNP"
-VISUALIZE: True
+VISUALIZE: False
 MODEL:
   IMG_SIZE: (256,256)
   BEST_OF_MANY: True
@@ -11,10 +11,10 @@ MODEL:
   LATENT_DIST: "gaussian"
   LATENT_DIM: 32
 
-  PRED_LEN: 45 # input and pred_len is defined in 30FPS
+  PRED_LEN: 75 # input and pred_len is defined in 25FPS
   GLOBAL_EMBED_SIZE: 256
   GLOBAL_HIDDEN_SIZE: 256
-  GLOBAL_INPUT_DIM: 4
+  GLOBAL_INPUT_DIM: 2 #TODO
   DROPOUT: 0.0
 
   ENC_CONCAT_TYPE: "average"
@@ -24,10 +24,10 @@ MODEL:
   ENC_HIDDEN_SIZE: 256
   DEC_INPUT_SIZE: 256
   DEC_HIDDEN_SIZE: 256
-  DEC_OUTPUT_DIM: 4
+  DEC_OUTPUT_DIM: 2 #TODO
 DATASET:
-  NAME: "PIE"
-  ROOT: "/media/wjh/WD_BLACK1/dataset/PIE"
+  NAME: "HighD"
+  ROOT: "/home/wjh/workspace/UncertaintySafeField/highD/data/highd_changeLane" #TODO
   # TRAJECTORY_PATH: "data/PIE_dataset/trajectories/"
   BBOX_TYPE: "cxcywh" # bbox is in cxcywh format
   NORMALIZE: "zero-one"

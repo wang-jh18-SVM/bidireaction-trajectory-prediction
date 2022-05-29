@@ -1,4 +1,7 @@
 import os
+import pandas as pd
+from tqdm import tqdm
+import pickle
 
 import json
 import pickle as pkl
@@ -8,7 +11,7 @@ import torch
 from torch.utils import data
 from bitrap.structures.trajectory_ops import *
 from bitrap.utils.box_utils import signedIOU
-from datasets.PIE_origin import PIE
+# from datasets.PIE_origin import PIE
 from . import transforms as T
 from torchvision.transforms import functional as F
 import copy
@@ -17,68 +20,142 @@ import glob
 import time
 import pdb
 
+POS = "position"
+X = "x"
+Y = "y"
+X_VELOCITY = "xVelocity"
+Y_VELOCITY = "yVelocity"
 
-class PIEDataset(data.Dataset):
+PRECEDING_X = "precedingX"
+PRECEDING_Y = "precedingY"
+PRECEDING_X_VELOCITY = "precedingXVelocity"
+
+FOLLOWING_X = "followingX"
+FOLLOWING_Y = "followingY"
+FOLLOWING_X_VELOCITY = "followingXVelocity"
+
+LEFT_PRECEDING_X = "leftPrecedingX"
+LEFT_PRECEDING_Y = "leftPrecedingY"
+LEFT_PRECEDING_X_VELOCITY = "leftPrecedingXVelocity"
+
+LEFT_ALONGSIDE_X = "leftAlongsideX"
+LEFT_ALONGSIDE_Y = "leftAlongsideY"
+LEFT_ALONGSIDE_X_VELOCITY = "leftAlongsideXVelocity"
+
+LEFT_FOLLOWING_X = "leftFollowingX"
+LEFT_FOLLOWING_Y = "leftFollowingY"
+LEFT_FOLLOWING_X_VELOCITY = "leftFollowingXVelocity"
+
+RIGHT_PRECEDING_X = "rightPrecedingX"
+RIGHT_PRECEDING_Y = "rightPrecedingY"
+RIGHT_PRECEDING_X_VELOCITY = "rightPrecedingXVelocity"
+
+RIGHT_ALONGSIDE_X = "rightAlongsideX"
+RIGHT_ALONGSIDE_Y = "rightAlongsideY"
+RIGHT_ALONGSIDE_X_VELOCITY = "rightAlongsideXVelocity"
+
+RIGHT_FOLLOWING_X = "rightFollowingX"
+RIGHT_FOLLOWING_Y = "rightFollowingY"
+RIGHT_FOLLOWING_X_VELOCITY = "rightFollowingXVelocity"
+
+TARGET_PRECEDING_X = "targetPrecedingX"
+TARGET_PRECEDING_Y = "targetPrecedingY"
+TARGET_PRECEDING_X_VELOCITY = "targetPrecedingXVelocity"
+
+TARGET_FOLLOWING_X = "targetFollowingX"
+TARGET_FOLLOWING_Y = "targetFollowingY"
+TARGET_FOLLOWING_X_VELOCITY = "targetFollowingXVelocity"
+
+
+class HighDDataSet(data.Dataset):
     def __init__(self, cfg, split):
         self.split = split
         self.root = cfg.DATASET.ROOT
         self.cfg = cfg
         # NOTE: add downsample function
         self.downsample_step = int(30 / self.cfg.DATASET.FPS)
-        traj_data_opts = {
-            'fstride': 1,
-            'sample_type': 'all',
-            'height_rng': [0, float('inf')],
-            'squarify_ratio': 0,
-            'data_split_type': 'default',  # kfold, random, default
-            'seq_type': 'trajectory',
-            'min_track_size': 61,
-            'random_params': {
-                'ratios': None,
-                'val_data': True,
-                'regen_data': True
-            },
-            'kfold_params': {
-                'num_folds': 5,
-                'fold': 1
-            }
-        }
+        # traj_data_opts = {
+        #     'fstride': 1,
+        #     'sample_type': 'all',
+        #     'height_rng': [0, float('inf')],
+        #     'squarify_ratio': 0,
+        #     'data_split_type': 'default',  # kfold, random, default
+        #     'seq_type': 'trajectory',
+        #     'min_track_size': 61,
+        #     'random_params': {
+        #         'ratios': None,
+        #         'val_data': True,
+        #         'regen_data': True
+        #     },
+        #     'kfold_params': {
+        #         'num_folds': 5,
+        #         'fold': 1
+        #     }
+        # }
 
         traj_model_opts = {
             'normalize_bbox': True,
-            'track_overlap': 0.5,
-            'observe_length': 15,
-            'predict_length': 45,
-            'enc_input_type': ['bbox'],
+            'track_overlap': 0.5,  # 切分时重叠多少
+            'observe_length': 25,
+            'predict_length': 75,
+            'enc_input_type': [POS],  # TODO
             'dec_input_type': [],
-            'prediction_type': ['bbox']
+            'prediction_type': [POS]  # TODO
         }
-        imdb = PIE(data_path=self.root)
+        self.relevant_input_type = [
+            X_VELOCITY,
+            Y_VELOCITY,
+            PRECEDING_X,
+            PRECEDING_Y,
+            PRECEDING_X_VELOCITY,
+            FOLLOWING_X,
+            FOLLOWING_Y,
+            FOLLOWING_X_VELOCITY,
+            LEFT_PRECEDING_X,
+            LEFT_PRECEDING_Y,
+            LEFT_PRECEDING_X_VELOCITY,
+            LEFT_ALONGSIDE_X,
+            LEFT_ALONGSIDE_Y,
+            LEFT_ALONGSIDE_X_VELOCITY,
+            LEFT_FOLLOWING_X,
+            LEFT_FOLLOWING_Y,
+            LEFT_FOLLOWING_X_VELOCITY,
+            RIGHT_PRECEDING_X,
+            RIGHT_PRECEDING_Y,
+            RIGHT_PRECEDING_X_VELOCITY,
+            RIGHT_ALONGSIDE_X,
+            RIGHT_ALONGSIDE_Y,
+            RIGHT_ALONGSIDE_X_VELOCITY,
+            RIGHT_FOLLOWING_X,
+            RIGHT_FOLLOWING_Y,
+            RIGHT_FOLLOWING_X_VELOCITY,
+        ]
+        # imdb = PIE(data_path=self.root)
 
         traj_model_opts['enc_input_type'].extend(
-            ['obd_speed', 'heading_angle'])
-        traj_model_opts['prediction_type'].extend(
-            ['obd_speed', 'heading_angle'])
-        beh_seq = imdb.generate_data_trajectory_sequence(
-            self.split, **traj_data_opts)
-        self.data = self.get_traj_data(beh_seq, **traj_model_opts)
+            self.relevant_input_type)  # TODO
+        # traj_model_opts['prediction_type'].extend(
+        #     ['obd_speed', 'heading_angle'])
+        # beh_seq = imdb.generate_data_trajectory_sequence(
+        #     self.split, **traj_data_opts)
+        self.data = self.get_traj_data(**traj_model_opts)
 
     def __getitem__(self, index):
         obs_bbox = torch.FloatTensor(self.data['obs_bbox'][index])
         pred_bbox = torch.FloatTensor(self.data['pred_bbox'][index])
-        cur_image_file = self.data['obs_image'][index][-1]
-        pred_resolution = torch.FloatTensor(
-            self.data['pred_resolution'][index])
+        # cur_image_file = self.data['obs_image'][index][-1]
+        # pred_resolution = torch.FloatTensor(
+        #     self.data['pred_resolution'][index])
 
         ret = {
             'input_x': obs_bbox,
             'target_y': pred_bbox,
-            'cur_image_file': cur_image_file
+            # 'cur_image_file': cur_image_file
         }
 
-        ret['timestep'] = int(cur_image_file.split('/')[-1].split('.')[0])
+        # ret['timestep'] = int(cur_image_file.split('/')[-1].split('.')[0])
 
-        ret['pred_resolution'] = pred_resolution
+        # ret['pred_resolution'] = pred_resolution
         return ret
 
     def __len__(self):
@@ -113,9 +190,9 @@ class PIEDataset(data.Dataset):
             except:  # KeyError:
                 raise KeyError('Wrong data type is selected %s' % dt)
 
-        d['image'] = dataset['image']
-        d['pid'] = dataset['pid']
-        d['resolution'] = dataset['resolution']
+        # d['image'] = dataset['image']
+        # d['pid'] = dataset['pid']
+        # d['resolution'] = dataset['resolution']
 
         #  Sample tracks from sequneces
         for k in d.keys():
@@ -125,9 +202,9 @@ class PIEDataset(data.Dataset):
                     tracks.append(track[i:i + seq_length])
             d[k] = tracks
         #  Normalize tracks using FOL paper method,
-        d['bbox'] = self.convert_normalize_bboxes(d['bbox'], d['resolution'],
-                                                  self.cfg.DATASET.NORMALIZE,
-                                                  self.cfg.DATASET.BBOX_TYPE)
+        # d['bbox'] = self.convert_normalize_bboxes(d['bbox'], d['resolution'],
+        #                                           self.cfg.DATASET.NORMALIZE,
+        #                                           self.cfg.DATASET.BBOX_TYPE)
         return d
 
     def convert_normalize_bboxes(self, all_bboxes, all_resolutions, normalize,
@@ -182,7 +259,7 @@ class PIEDataset(data.Dataset):
         else:
             return d
 
-    def get_traj_data(self, data, **model_opts):
+    def get_traj_data(self, **model_opts):
         """
         Main data generation function for training/testing
         :param data: The raw data
@@ -206,6 +283,55 @@ class PIEDataset(data.Dataset):
         observe_length = opts['observe_length']
         data_types = set(opts['enc_input_type'] + opts['dec_input_type'] +
                          opts['prediction_type'])
+
+        file_dir = self.root
+        data_path = os.path.join(file_dir, 'data.pickle')
+        try:
+            with open(data_path, 'rb') as data_file:
+                print("Loading Pickle Data")
+                data = pickle.load(data_file)
+        except:
+            print("Loading Raw Data CSV")
+            files = os.listdir(file_dir)
+            data = {
+                POS: [],
+                X_VELOCITY: [],
+                Y_VELOCITY: [],
+                PRECEDING_X: [],
+                PRECEDING_Y: [],
+                PRECEDING_X_VELOCITY: [],
+                FOLLOWING_X: [],
+                FOLLOWING_Y: [],
+                FOLLOWING_X_VELOCITY: [],
+                LEFT_PRECEDING_X: [],
+                LEFT_PRECEDING_Y: [],
+                LEFT_PRECEDING_X_VELOCITY: [],
+                LEFT_ALONGSIDE_X: [],
+                LEFT_ALONGSIDE_Y: [],
+                LEFT_ALONGSIDE_X_VELOCITY: [],
+                LEFT_FOLLOWING_X: [],
+                LEFT_FOLLOWING_Y: [],
+                LEFT_FOLLOWING_X_VELOCITY: [],
+                RIGHT_PRECEDING_X: [],
+                RIGHT_PRECEDING_Y: [],
+                RIGHT_PRECEDING_X_VELOCITY: [],
+                RIGHT_ALONGSIDE_X: [],
+                RIGHT_ALONGSIDE_Y: [],
+                RIGHT_ALONGSIDE_X_VELOCITY: [],
+                RIGHT_FOLLOWING_X: [],
+                RIGHT_FOLLOWING_Y: [],
+                RIGHT_FOLLOWING_X_VELOCITY: [],
+            }  #TODO
+            for file_name in tqdm(files):
+                if 'set' in file_name:
+                    df = pd.read_csv(os.path.join(file_dir, file_name))
+                    data[POS].append(np.array(df[[X, Y]]))
+                    for input_type in self.relevant_input_type:
+                        data[input_type].append(np.array(df[[input_type]]))
+            data_file = open(data_path, 'wb')
+            pickle.dump(data, data_file)
+            data_file.close()
+
         data_tracks = self.get_traj_tracks(data, data_types, observe_length,
                                            opts['predict_length'],
                                            opts['track_overlap'],
@@ -224,14 +350,14 @@ class PIEDataset(data.Dataset):
                 [d[observe_length + down - 1::down] for d in data_tracks[k]])
 
         ret = {
-            'obs_image': obs_slices['image'],
-            'obs_pid': obs_slices['pid'],
-            'obs_resolution': obs_slices['resolution'],
-            'pred_image': pred_slices['image'],
-            'pred_pid': pred_slices['pid'],
-            'pred_resolution': pred_slices['resolution'],
-            'obs_bbox': np.array(obs_slices['bbox']),  #enc_input,\
-            'pred_bbox': np.array(pred_slices['bbox']),  #pred_target,
+            # 'obs_image': obs_slices['image'],
+            # 'obs_pid': obs_slices['pid'],
+            # 'obs_resolution': obs_slices['resolution'],
+            # 'pred_image': pred_slices['image'],
+            # 'pred_pid': pred_slices['pid'],
+            # 'pred_resolution': pred_slices['resolution'],
+            'obs_bbox': np.array(obs_slices[POS]),  #enc_input,\
+            'pred_bbox': np.array(pred_slices[POS]),  #pred_target,
         }
 
         return ret
