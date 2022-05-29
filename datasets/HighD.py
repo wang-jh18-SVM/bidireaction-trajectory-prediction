@@ -66,6 +66,8 @@ TARGET_FOLLOWING_X = "targetFollowingX"
 TARGET_FOLLOWING_Y = "targetFollowingY"
 TARGET_FOLLOWING_X_VELOCITY = "targetFollowingXVelocity"
 
+LINEAR_FEATURE = "linearFeature"
+
 
 class HighDDataSet(data.Dataset):
     def __init__(self, cfg, split):
@@ -98,7 +100,7 @@ class HighDDataSet(data.Dataset):
             'track_overlap': 0.5,  # 切分时重叠多少
             'observe_length': 25,
             'predict_length': 75,
-            'enc_input_type': [POS],  # TODO
+            'enc_input_type': [LINEAR_FEATURE],  # TODO
             'dec_input_type': [],
             'prediction_type': [POS]  # TODO
         }
@@ -132,8 +134,8 @@ class HighDDataSet(data.Dataset):
         ]
         # imdb = PIE(data_path=self.root)
 
-        traj_model_opts['enc_input_type'].extend(
-            self.relevant_input_type)  # TODO
+        # traj_model_opts['enc_input_type'].extend(
+        #     self.relevant_input_type)  # TODO
         # traj_model_opts['prediction_type'].extend(
         #     ['obd_speed', 'heading_angle'])
         # beh_seq = imdb.generate_data_trajectory_sequence(
@@ -321,13 +323,16 @@ class HighDDataSet(data.Dataset):
                 RIGHT_FOLLOWING_X: [],
                 RIGHT_FOLLOWING_Y: [],
                 RIGHT_FOLLOWING_X_VELOCITY: [],
+                LINEAR_FEATURE: []
             }  #TODO
             for file_name in tqdm(files):
                 if 'set' in file_name:
                     df = pd.read_csv(os.path.join(file_dir, file_name))
                     data[POS].append(np.array(df[[X, Y]]))
-                    for input_type in self.relevant_input_type:
-                        data[input_type].append(np.array(df[[input_type]]))
+                    # for input_type in self.relevant_input_type:
+                    #     data[input_type].append(np.array(df[[input_type]]))
+                    data[LINEAR_FEATURE].append(
+                        np.array(df[[X, Y] + self.relevant_input_type]))
             data_file = open(data_path, 'wb')
             pickle.dump(data, data_file)
             data_file.close()
@@ -356,7 +361,7 @@ class HighDDataSet(data.Dataset):
             # 'pred_image': pred_slices['image'],
             # 'pred_pid': pred_slices['pid'],
             # 'pred_resolution': pred_slices['resolution'],
-            'obs_bbox': np.array(obs_slices[POS]),  #enc_input,\
+            'obs_bbox': np.array(obs_slices[LINEAR_FEATURE]),  #enc_input,\
             'pred_bbox': np.array(pred_slices[POS]),  #pred_target,
         }
 
