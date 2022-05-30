@@ -1,6 +1,7 @@
-PROJECT: "bitrap_np_pie"
-CKPT_DIR: "checkpoints/PIE_checkpoints/goal_cvae_checkpoints/"
-OUT_DIR: "outputs/PIE_outputs/goal_cvae_outputs"
+PROJECT: "bitrap_np_HighD"
+CKPT_DIR: "checkpoints/HighD_checkpoints/goal_cvae_checkpoints/"
+OUT_DIR: "outputs/HighD_outputs/goal_cvae_outputs"
+USE_WANDB: True
 DEVICE: "cuda"
 METHOD: "BiTraPNP"
 VISUALIZE: False
@@ -36,7 +37,7 @@ DATASET:
 DATALOADER:
   NUM_WORKERS: 24
 SOLVER:
-  MAX_EPOCH: 50
+  MAX_EPOCH: 150
   BATCH_SIZE: 128
   LR: 0.001
   scheduler: "plateau"

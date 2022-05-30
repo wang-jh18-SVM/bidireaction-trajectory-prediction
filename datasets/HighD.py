@@ -143,15 +143,15 @@ class HighDDataSet(data.Dataset):
         self.data = self.get_traj_data(**traj_model_opts)
 
     def __getitem__(self, index):
-        obs_bbox = torch.FloatTensor(self.data['obs_bbox'][index])
-        pred_bbox = torch.FloatTensor(self.data['pred_bbox'][index])
+        linear_feature = torch.FloatTensor(self.data['linear_feature'][index])
+        pred_xy = torch.FloatTensor(self.data['pred_xy'][index])
         # cur_image_file = self.data['obs_image'][index][-1]
         # pred_resolution = torch.FloatTensor(
         #     self.data['pred_resolution'][index])
 
         ret = {
-            'input_x': obs_bbox,
-            'target_y': pred_bbox,
+            'input_x': linear_feature,
+            'target_y': pred_xy,
             # 'cur_image_file': cur_image_file
         }
 
@@ -361,8 +361,9 @@ class HighDDataSet(data.Dataset):
             # 'pred_image': pred_slices['image'],
             # 'pred_pid': pred_slices['pid'],
             # 'pred_resolution': pred_slices['resolution'],
-            'obs_bbox': np.array(obs_slices[LINEAR_FEATURE]),  #enc_input,\
-            'pred_bbox': np.array(pred_slices[POS]),  #pred_target,
+            'linear_feature':
+            np.array(obs_slices[LINEAR_FEATURE]),  #enc_input,\
+            'pred_xy': np.array(pred_slices[POS]),  #pred_target,
         }
 
         return ret
